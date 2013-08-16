@@ -156,7 +156,7 @@ int main(void)
 
 				//Send the counter
 				case 10: usiTwiTransmitByte(enc_pos.bytes[0]);
-						 usiTwiTransmitByte(enc_pos.bytes[1]);
+						 usiTwiTransmitByte(enc_pos.bytes[1]); 
 						 usiTwiTransmitByte(enc_pos.bytes[2]);
 						 usiTwiTransmitByte(enc_pos.bytes[3]); 
 						 break;
