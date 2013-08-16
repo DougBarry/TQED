@@ -11,8 +11,8 @@ void setup()
 
 void ChangeAddress()
 {
-  Serial.println("Changhing address to 0x38");
-  qed.setAddress(0x38);
+  Serial.println("Changing address to 0x40");
+  qed.setAddress(0x40);
 }
 
 void Center()

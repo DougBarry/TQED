@@ -31,13 +31,13 @@
 #define cbi(sfr, bit) (_SFR_BYTE(sfr) &= ~_BV(bit))
 #define DEFAULTADDRESS 0x36
 
-union doublebyte
+union quadruplebyte
 {
-  unsigned int value;
-  unsigned char bytes[2];
+  long value;
+  unsigned char bytes[4];
 };
 
-union doublebyte enc_pos;
+union quadruplebyte enc_pos;
 unsigned char enc_dir;
 unsigned char enc_last=0;
 unsigned char enc_now;
@@ -147,7 +147,7 @@ int main(void)
 						 break; 
 
 				//Center counter value
-				case 2 : enc_pos.value = 32767;
+				case 2 : enc_pos.value = 0;
 						 break;
 
 				//Set address
@@ -156,7 +156,9 @@ int main(void)
 
 				//Send the counter
 				case 10: usiTwiTransmitByte(enc_pos.bytes[0]);
-						 usiTwiTransmitByte(enc_pos.bytes[1]); 
+						 usiTwiTransmitByte(enc_pos.bytes[1]);
+						 usiTwiTransmitByte(enc_pos.bytes[2]);
+						 usiTwiTransmitByte(enc_pos.bytes[3]); 
 						 break;
 		
 				default : //Do nothing

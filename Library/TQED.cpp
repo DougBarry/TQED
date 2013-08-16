@@ -1,5 +1,5 @@
 /*
-  TQED.h - Quadrature decoder library for Arduino using I2C
+  TQED.cpp - Quadrature decoder library for Arduino using I2C
   Revision 1.1
   Copyright (c) 2012 Adriaan Swanepoel.  All right reserved.
 
@@ -28,28 +28,40 @@
 #include <Wire.h>
 #include <inttypes.h>
 
+union quadruplebyte
+{
+  long value;
+  unsigned char bytes[4];
+};
+
 TQED::TQED(uint8_t address)
 {
     deviceaddress = address;
     Wire.begin(); 
 }
 
-uint16_t TQED::getCount()
+long TQED::getCount()
 {
   Wire.beginTransmission(deviceaddress);
   Wire.write(COUNTERREG);
   Wire.endTransmission();
 
-  Wire.requestFrom(deviceaddress, (uint8_t)2);
+  Wire.requestFrom(deviceaddress, (uint8_t)4);
   int retry = 0;
-  while((Wire.available() < 2) && (retry < RETRYCOUNT))
+  while((Wire.available() < 4) && (retry < RETRYCOUNT))
     retry++;
   
-  if (Wire.available() >= 2)  
+  if (Wire.available() >= 4)  
   {
-    uint8_t a = Wire.read();
-    uint8_t b = Wire.read();
-    return word(b, a); 
+	union quadruplebyte count; 	
+	//read 4 bytes and turn them into long	
+	count.bytes[0] = Wire.read();
+	count.bytes[1] = Wire.read();
+	count.bytes[2] = Wire.read();
+	count.bytes[3] = Wire.read();
+	
+  
+    	return count.value; 
   } else return 0;
 }
 
@@ -61,12 +73,12 @@ bool TQED::centerCount()
   return true;
 }
 
-bool TQED::resetCount()
+void TQED::resetCount()
 {
   Wire.beginTransmission(deviceaddress);
   Wire.write(RESETREG);
   Wire.endTransmission();
-  return true;
+  return;
 }
 
 bool TQED::setAddress(uint8_t newaddress)

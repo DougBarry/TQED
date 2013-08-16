@@ -35,9 +35,9 @@ private:
 	
 public:
     TQED(uint8_t address);
-    uint16_t getCount();
+    long getCount();
     bool centerCount();
-    bool resetCount();
+    void resetCount();
     bool setAddress(uint8_t newaddress);
 };
 
