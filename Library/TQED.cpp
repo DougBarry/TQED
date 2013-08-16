@@ -73,12 +73,12 @@ bool TQED::centerCount()
   return true;
 }
 
-void TQED::resetCount()
+bool TQED::resetCount()
 {
   Wire.beginTransmission(deviceaddress);
   Wire.write(RESETREG);
   Wire.endTransmission();
-  return;
+  return true;
 }
 
 bool TQED::setAddress(uint8_t newaddress)
