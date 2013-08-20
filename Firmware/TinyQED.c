@@ -1,9 +1,11 @@
 /***************************************************************************
 * File              : TinyQED
 * Compiler          : AVRstudio 5.1
-* Revision          : 1.1
-* Date              : Tuesday, March 23, 2012
-* Revised by        : Adriaan Swanepoel
+* Revision          : 1.2
+* Date              : Tuesday, August 20, 2013
+* Revised by        : Kristof Robot
+*					: Added 4x resolution based on http://tutorial.cytron.com.my/2012/01/17/quadrature-encoder/
+*					: Adriaan Swanepoel
 *                   : Adapted from Dan Gates I2C analogue slave
 *					  http://www.avrfreaks.net/index.php?name=PNphpBB2&file=viewtopic&t=51467
 *                     and Jim Remington's Quadrature encoder for the O 
@@ -15,8 +17,8 @@
 *                               ATTiny45
 *                 +--------------------------------+
 *                 | 1 pb5 reset              VCC 8 | VCC
-*         Motor A | 2 pb3                    pb2 7 | SCL
-*         Motor B | 3 pb4                    pb1 6 | 
+*       Channel A | 2 pb3                    pb2 7 | SCL
+*       Channel B | 3 pb4                    pb1 6 | 
 *             GND | 4 GND                    pb0 5 | SDA
 *                 +--------------------------------+
 ****************************************************************************/
@@ -31,9 +33,12 @@
 #define cbi(sfr, bit) (_SFR_BYTE(sfr) &= ~_BV(bit))
 #define DEFAULTADDRESS 0x36
 
+//uncomment for 4x resolution; default is 2x resolution
+#define ENCODER_4X_RESOLUTION
+
 union quadruplebyte
 {
-  long value;
+  int32_t value;
   unsigned char bytes[4];
 };
 
@@ -52,20 +57,56 @@ unsigned char EEMEM slaveaddress = DEFAULTADDRESS;  //Default address
  * RETURN:		none
  *
  *****************************************************************************/
+#ifdef ENCODER_4X_RESOLUTION
+//4x version, based on http://tutorial.cytron.com.my/2012/01/17/quadrature-encoder/
 ISR (PCINT0_vect)
 {
-	enc_now = (PINB & (3 << 3)) >> 3;                //read the port pins and shift result to bottom bits
+	enc_now = (PINB & (3 << 3)) >> 3; //read the current state
+	
+    switch(enc_now){
+		case 0:
+			if (enc_last==1)
+				enc_pos.value--;
+			else
+				enc_pos.value++;
+			break;
+		case 1:
+			if (enc_last==3)
+				enc_pos.value--;
+			else
+				enc_pos.value++;
+			break;
+		case 2:
+			if (enc_last==0)
+				enc_pos.value--;
+			else
+				enc_pos.value++;
+			break;
+		case 3:
+			if (enc_last==2)
+				enc_pos.value--;
+			else
+				enc_pos.value++;
+			break;
+	}
+	
+	enc_last = enc_now;	//remember last state
+}
+#else
+//2x resolution; default
+ISR (PCINT0_vect)
+{
+	enc_now = (PINB & (3 << 3)) >> 3;             //read the port pins and shift result to bottom bits
 	enc_dir = (enc_last & 1) ^ ((enc_now & 2) >> 1); //determine direction of rotation
   
-	if(enc_dir == 0) 
-		enc_pos.value++; 
- 
-		else   
-
-			enc_pos.value--;	//update encoder position
+	if (enc_dir == 0)
+		enc_pos.value++;
+	else
+		enc_pos.value--;	//update encoder position
   
-	enc_last = enc_now;			//remember last state
+	enc_last = enc_now;		//remember last state
 }
+#endif
 
 /******************************************************************************
  *
@@ -109,7 +150,13 @@ int main(void)
 	unsigned char temp;
 	enc_pos.value = 0;
 
+#ifdef ENCODER_4X_RESOLUTION
+	//4x resolution
+	PCMSK |= (1 << PCINT3)|(1 << PCINT4); // tell pin change mask to listen to pin2 (PB3) and pin3 (PB4)
+#else
+	//2x resolution; default
 	PCMSK |= (1 << PCINT3); // tell pin change mask to listen to pin2
+#endif
 	GIMSK |= (1 << PCIE);   // enable PCINT interrupt in the general interrupt mask
   
 	sei();
