@@ -42,10 +42,15 @@ union quadruplebyte
   unsigned char bytes[4];
 };
 
-union quadruplebyte enc_pos;
+volatile union quadruplebyte enc_pos;
+
+#ifdef ENCODER_4X_RESOLUTION
+#else
 unsigned char enc_dir;
 unsigned char enc_last=0;
 unsigned char enc_now;
+#endif
+
 unsigned char EEMEM slaveaddress = DEFAULTADDRESS;  //Default address
 
 /******************************************************************************
@@ -58,39 +63,17 @@ unsigned char EEMEM slaveaddress = DEFAULTADDRESS;  //Default address
  *
  *****************************************************************************/
 #ifdef ENCODER_4X_RESOLUTION
-//4x version, based on http://tutorial.cytron.com.my/2012/01/17/quadrature-encoder/
+//4x version, based on http://www.circuitsathome.com/mcu/rotary-encoder-interrupt-service-routine-for-avr-micros
 ISR (PCINT0_vect)
 {
-	enc_now = (PINB & (3 << 3)) >> 3; //read the current state
+	static uint8_t enc_last=0;
+	static const int8_t enc_states [] = {0,1,-1,0,-1,0,0,1,1,0,0,-1,0,-1,1,0};  //encoder lookup table
+
+	enc_last <<=2; //shift previous state two places
+	enc_last |= (PINB & (3 << 3)) >> 3; //read the current state into lowest 2 bits
+
+	enc_pos.value += enc_states[(enc_last & 0x0f)];
 	
-    switch(enc_now){
-		case 0:
-			if (enc_last==1)
-				enc_pos.value--;
-			else
-				enc_pos.value++;
-			break;
-		case 1:
-			if (enc_last==3)
-				enc_pos.value--;
-			else
-				enc_pos.value++;
-			break;
-		case 2:
-			if (enc_last==0)
-				enc_pos.value--;
-			else
-				enc_pos.value++;
-			break;
-		case 3:
-			if (enc_last==2)
-				enc_pos.value--;
-			else
-				enc_pos.value++;
-			break;
-	}
-	
-	enc_last = enc_now;	//remember last state
 }
 #else
 //2x resolution; default
