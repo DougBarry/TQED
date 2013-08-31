@@ -19,8 +19,9 @@
 *  and a polling delay of 20ms (i.e. about 50Hz polling rate),
 *  i.e. expected rate of ticks is 390.
 *  We find indeed an average rate of about 390, which is maintained consistently with an accuracy of <2 ticks 
-*  Of course this requires careful tuning of both signal generator and the polling loop timing (using DELAY_* values), 
-*  using a logic analyzer.
+*  Of course this requires careful tuning of the polling loop timing (using DELAY_* values).
+*  Below timings worked for me, but you might need to re-tune, 
+*  especially if you print out different/other output via Serial.
 *
 */
 
@@ -34,18 +35,16 @@ long currentCount=0L;
 long prevCount2=0L;
 long currentCount2=0L;
 long count=0L;
+long errorCount=0L;
+long errorCount2=0L;
+int extraDelay=0;
 
 const int EXPECTED_TICKS=390; //fill in expected value here
 const int ACCURACY=2; //fill in expected accuracy here
-const int ACCURACY_FREQ=10; //how often should we check accuracy and print out? 
-//Note that printing out over Serial does interfere with accuracy at high frequencies, 
-//therefore it is best to limit this to the minimum.
-//On the other hand, if your real application uses the same hardware, 
-//and does use a lot of Serial communication, 
-//it is best to mimic that for relevant results.
-const int STATUS_FREQ=500; //how often should we print results to serial?
+const int STATUS_FREQ=100; //how often should we print results to serial?
 const int DELAY_BETWEEN_POLLS=20; //how long should we wait between polling (in ms);
-const int DELAY_LOOP_US=750; //delay that loop itself takes (in us), to be subtracted from above delay to get a precise timing
+const int DELAY_LOOP_US=715; //delay that loop itself takes (in us), to be subtracted from above delay to get a precise timing
+const int DELAY_STATUS=200; //extra delay when status message is printed
 
 #define TWI_FREQ_FAST 400000L  //I2C bus speed, default is 100kHz, this value allows speeds up to 400Khz
 
@@ -56,8 +55,18 @@ void setup()
   
   Serial.begin(115200);  // start serial for output
   Serial.println("Dual TQED Counter Test");
+  Serial.println("Prints out 'OK' if accuracy is within ");
+  Serial.print(ACCURACY);
+  Serial.print(" ticks of ");
+  Serial.print(EXPECTED_TICKS);
+  Serial.print(" expected ticks per interval of ");
+  Serial.print(DELAY_BETWEEN_POLLS);
+  Serial.println(" ms.");
+  Serial.println("Otherwise it prints out number of errors, detected tick rate, and resets error counts.");
   qed.resetCount();
   qed2.resetCount();
+  errorCount=-1; //init at -1, as first round will always give error
+  errorCount2=-1;
 }
 
 
@@ -68,35 +77,36 @@ void loop()
   currentCount2=qed2.getCount();
 
   //check accuracy
-  if (count%ACCURACY_FREQ==0){
-    if (abs(currentCount-prevCount-EXPECTED_TICKS) > ACCURACY) {
-      //print error message
-      Serial.print("E1:");
-      Serial.println(currentCount-prevCount);
-    }
+  if (abs(currentCount-prevCount-EXPECTED_TICKS) > ACCURACY) {
+      errorCount++;
+  }
    
-    if (abs(currentCount2-prevCount2-EXPECTED_TICKS) > ACCURACY) {
-      //print error message
-      Serial.print("E2:");
-      Serial.println(currentCount2-prevCount2);
-    }
+  if (abs(currentCount2-prevCount2-EXPECTED_TICKS) > ACCURACY) {
+      errorCount2++;
   }
  
   count++;
-  if (count%STATUS_FREQ == 1) {
-    //print current values, as status
-    //note that printing out the status causes a slight additional delay, 
-    //impacting accuracy; that's why we compare STATS_FREQ with 1 here, not with 0, 
-    //to allow accuracy to recover before generating error messages
-    Serial.print("S:");
-    Serial.print(currentCount-prevCount);
-    Serial.print(" ");
-    Serial.println(currentCount2-prevCount2);
+  if (count%STATUS_FREQ == 0) {
+    if ((errorCount+errorCount2)==0 ) {
+      Serial.println("OK"); //2 errors is normal because of startup
+      extraDelay=DELAY_STATUS;
+    } else {
+      Serial.print(errorCount);
+      Serial.print(" ");
+      Serial.println(errorCount2);
+      Serial.print(currentCount-prevCount);
+      Serial.print(" ");
+      Serial.println(currentCount2-prevCount2);
+      
+      //reset error counts
+      errorCount=-1;
+      errorCount2=-1;
+    }
   }
   
   prevCount=currentCount;
   prevCount2=currentCount2;
   
   delay(DELAY_BETWEEN_POLLS-1);
-  delayMicroseconds(1000-DELAY_LOOP_US);  //to account for processing time.
+  delayMicroseconds(1000-DELAY_LOOP_US-extraDelay); //account for status reporting
 }
