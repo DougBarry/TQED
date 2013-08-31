@@ -30,7 +30,7 @@
 
 union quadruplebyte
 {
-  long value;
+  int32_t value;
   unsigned char bytes[4];
 };
 
