@@ -1,8 +1,8 @@
 /***************************************************************************
 * File              : TinyQED
 * Compiler          : AVRstudio 5.1
-* Revision          : 1.2
-* Date              : Tuesday, August 20, 2013
+* Revision          : 1.3
+* Date              : Saturday, August 31, 2013
 * Revised by        : Kristof Robot
 *					: Added 4x resolution based on http://tutorial.cytron.com.my/2012/01/17/quadrature-encoder/
 *					: Adriaan Swanepoel
@@ -31,7 +31,8 @@
 
 #define sbi(sfr, bit) (_SFR_BYTE(sfr) |= _BV(bit))
 #define cbi(sfr, bit) (_SFR_BYTE(sfr) &= ~_BV(bit))
-#define DEFAULTADDRESS 0x36
+//#define DEFAULTADDRESS 0x36
+#define DEFAULTADDRESS 0x38
 
 //uncomment for 4x resolution; default is 2x resolution
 #define ENCODER_4X_RESOLUTION
@@ -42,7 +43,7 @@ union quadruplebyte
   unsigned char bytes[4];
 };
 
-volatile union quadruplebyte enc_pos;
+volatile int32_t enc_pos=0L;
 
 #ifdef ENCODER_4X_RESOLUTION
 #else
@@ -72,7 +73,7 @@ ISR (PCINT0_vect)
 	enc_last <<=2; //shift previous state two places
 	enc_last |= (PINB & (3 << 3)) >> 3; //read the current state into lowest 2 bits
 
-	enc_pos.value += enc_states[(enc_last & 0x0f)];
+	enc_pos += enc_states[(enc_last & 0x0f)];
 	
 }
 #else
@@ -83,9 +84,9 @@ ISR (PCINT0_vect)
 	enc_dir = (enc_last & 1) ^ ((enc_now & 2) >> 1); //determine direction of rotation
   
 	if (enc_dir == 0)
-		enc_pos.value++;
+		enc_pos++;
 	else
-		enc_pos.value--;	//update encoder position
+		enc_pos--;	//update encoder position
   
 	enc_last = enc_now;		//remember last state
 }
@@ -131,7 +132,8 @@ unsigned char readaddress()
 int main(void)
 {
 	unsigned char temp;
-	enc_pos.value = 0;
+	enc_pos = 0L;
+	union quadruplebyte position;
 
 #ifdef ENCODER_4X_RESOLUTION
 	//4x resolution
@@ -142,7 +144,7 @@ int main(void)
 #endif
 	GIMSK |= (1 << PCIE);   // enable PCINT interrupt in the general interrupt mask
   
-	sei();
+	sei(); //enable interrupts
 
 	cbi(DDRB, DDB3);        // PB3 set up as input
 	cbi(DDRB, DDB4);        // PB4 set up as input
@@ -159,7 +161,7 @@ int main(void)
 		setaddress(address);
 	}
 
-	usiTwiSlaveInit(address); //readaddress());
+	usiTwiSlaveInit(address);
 
 	for (;;)
 	{	
@@ -167,36 +169,24 @@ int main(void)
 		{
 			temp = usiTwiReceiveByte();
      
-			//which register requested
-			//1..9   Reserved Commands
-			//10..19 Reserved Data
-			switch (temp)
+			/*
+			* Replaced switch statement by if-else construction
+			* and put in order of most frequently used
+			* to speed up most frequent call (read counter)
+			*/
+			if (temp == 10) //read counter
 			{
-				//Reset the counter
-				case 1 : enc_pos.value = 0; 
-						 break; 
-
-				//Center counter value
-				case 2 : enc_pos.value = 0;
-						 break;
-
-				//Set address
-				case 3 : setaddress(usiTwiReceiveByte());
-						 break;
-
-				//Send the counter
-				case 10: usiTwiTransmitByte(enc_pos.bytes[0]);
-						 usiTwiTransmitByte(enc_pos.bytes[1]); 
-						 usiTwiTransmitByte(enc_pos.bytes[2]);
-						 usiTwiTransmitByte(enc_pos.bytes[3]); 
-						 break;
-		
-				default : //Do nothing
-						 break;
-			}	  
+				 //store current enc_pos in quadruplebyte position variable
+				 position.value = enc_pos;
+				 usiTwiTransmitByte(position.bytes[0]);
+				 usiTwiTransmitByte(position.bytes[1]); 
+				 usiTwiTransmitByte(position.bytes[2]);
+				 usiTwiTransmitByte(position.bytes[3]); 
+			}
+			else if (temp == 1) enc_pos = 0L; //reset counter
+			else if (temp == 2) enc_pos = 0L; //center counter value 
+			else if (temp == 3) setaddress(usiTwiReceiveByte());
 		}
-
-		asm volatile ("NOP"::);
 	}
 }
 
