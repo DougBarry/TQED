@@ -28,6 +28,7 @@
 #include <avr/interrupt.h>
 #include <avr/eeprom.h>
 #include "usiTwiSlave.h"
+#include "TinyQEDI2CCMD.h"
 
 #define sbi(sfr, bit) (_SFR_BYTE(sfr) |= _BV(bit))
 #define cbi(sfr, bit) (_SFR_BYTE(sfr) &= ~_BV(bit))
@@ -35,7 +36,7 @@
 #define DEFAULTADDRESS 0x38
 
 //uncomment for 4x resolution; default is 2x resolution
-#define ENCODER_4X_RESOLUTION
+//#define ENCODER_4X_RESOLUTION
 
 union quadruplebyte
 {
@@ -103,7 +104,7 @@ ISR (PCINT0_vect)
  *****************************************************************************/
 void setaddress(unsigned char address)
 {
-	eeprom_write_byte(&slaveaddress, (uint8_t*)address);
+	eeprom_write_byte(&slaveaddress, (uint8_t*)(uint16_t)address);
 }
 
 /******************************************************************************
@@ -131,7 +132,7 @@ unsigned char readaddress()
  *****************************************************************************/
 int main(void)
 {
-	unsigned char temp;
+	unsigned char i2ccmd;
 	enc_pos = 0L;
 	union quadruplebyte position;
 
@@ -167,14 +168,14 @@ int main(void)
 	{	
 		if (usiTwiDataInReceiveBuffer())
 		{
-			temp = usiTwiReceiveByte();
+			i2ccmd = usiTwiReceiveByte();
      
 			/*
 			* Replaced switch statement by if-else construction
 			* and put in order of most frequently used
 			* to speed up most frequent call (read counter)
 			*/
-			if (temp == 10) //read counter
+			if (i2ccmd == I2CCMD_READ_COUNTER) //read counter
 			{
 				 //store current enc_pos in quadruplebyte position variable
 				 position.value = enc_pos;
@@ -183,10 +184,15 @@ int main(void)
 				 usiTwiTransmitByte(position.bytes[2]);
 				 usiTwiTransmitByte(position.bytes[3]); 
 			}
-			else if (temp == 1) enc_pos = 0L; //reset counter
-			else if (temp == 2) enc_pos = 0L; //center counter value 
-			else if (temp == 3) setaddress(usiTwiReceiveByte());
+			#ifndef ENCODER_4X_RESOLUTION
+			else if (i2ccmd == I2CCMD_READ_LASTDIR)
+			{
+				usiTwiTransmitByte(enc_dir);
+			}
+			#endif
+			else if (i2ccmd == I2CCMD_RESET_COUNTER) enc_pos = 0L; //reset counter
+			else if (i2ccmd == I2CCMD_CENTER_COUNTER) enc_pos = 0L; //center counter value 
+			else if (i2ccmd == I2CCMD_SET_ADDRESS) setaddress(usiTwiReceiveByte());
 		}
 	}
 }
-
