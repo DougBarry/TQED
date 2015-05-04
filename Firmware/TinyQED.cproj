@@ -61,9 +61,6 @@
   </PropertyGroup>
   <Import Project="$(AVRSTUDIO_EXE_PATH)\\Vs\\Compiler.targets" />
   <ItemGroup>
-    <Compile Include="TinyQEDI2CCMD.h">
-      <SubType>compile</SubType>
-    </Compile>
     <Compile Include="usiTwiSlave.h">
       <SubType>compile</SubType>
     </Compile>

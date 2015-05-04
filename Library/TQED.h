@@ -22,10 +22,6 @@
 
 #include <inttypes.h>
 
-#define COUNTERREG    0x0A
-#define RESETREG      0x01
-#define CENTERREG     0x02
-#define SETADDRESSREG 0x03
 #define RETRYCOUNT    3
 
 class TQED
@@ -38,7 +34,10 @@ public:
     long getCount();
     bool centerCount();
     bool resetCount();
+    long getCounterMin();
+    long getCounterMax();
     bool setAddress(uint8_t newaddress);
+    uint8_t getAddress();
 };
 
 #endif

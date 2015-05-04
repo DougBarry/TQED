@@ -1,15 +1,18 @@
 /***************************************************************************
 * File              : TinyQED
-* Compiler          : AVRstudio 5.1
-* Revision          : 1.3
+* Compiler          : AVRstudio 6.2
+* Revision          : 1.4
 * Date              : Saturday, August 31, 2013
-* Revised by        : Kristof Robot
-*					: Added 4x resolution based on http://tutorial.cytron.com.my/2012/01/17/quadrature-encoder/
+* Revised by        : Douglas Barry
+*					:  Broke I2C commands out, added min/max/address commands. Moved to Atmel Studio 6.2 and Native compiler.
+*					:  Other minor changes.
+*					: Kristof Robot
+*					:  Added 4x resolution based on http://tutorial.cytron.com.my/2012/01/17/quadrature-encoder/
 *					: Adriaan Swanepoel
-*                   : Adapted from Dan Gates I2C analogue slave
-*					  http://www.avrfreaks.net/index.php?name=PNphpBB2&file=viewtopic&t=51467
-*                     and Jim Remington's Quadrature encoder for the O 
-*					  http://forum.pololu.com/viewtopic.php?t=484
+*                   :  Adapted from Dan Gates I2C analogue slave
+*					   http://www.avrfreaks.net/index.php?name=PNphpBB2&file=viewtopic&t=51467
+*                      and Jim Remington's Quadrature encoder for the O 
+*					   http://forum.pololu.com/viewtopic.php?t=484
 *
 * Target device		: ATtiny45
 *
@@ -27,16 +30,17 @@
 #include <avr/io.h>
 #include <avr/interrupt.h>
 #include <avr/eeprom.h>
+#include <limits.h>
 #include "usiTwiSlave.h"
-#include "TinyQEDI2CCMD.h"
+#include "../TQED_I2CCMD.h"
 
 #define sbi(sfr, bit) (_SFR_BYTE(sfr) |= _BV(bit))
 #define cbi(sfr, bit) (_SFR_BYTE(sfr) &= ~_BV(bit))
 //#define DEFAULTADDRESS 0x36
-#define DEFAULTADDRESS 0x38
+#define DEFAULTADDRESS 0x39
 
 //uncomment for 4x resolution; default is 2x resolution
-//#define ENCODER_4X_RESOLUTION
+#define ENCODER_4X_RESOLUTION
 
 union quadruplebyte
 {
@@ -175,7 +179,7 @@ int main(void)
 			* and put in order of most frequently used
 			* to speed up most frequent call (read counter)
 			*/
-			if (i2ccmd == I2CCMD_READ_COUNTER) //read counter
+			if (i2ccmd == TQED_READ_COUNTER) //read counter
 			{
 				 //store current enc_pos in quadruplebyte position variable
 				 position.value = enc_pos;
@@ -185,14 +189,34 @@ int main(void)
 				 usiTwiTransmitByte(position.bytes[3]); 
 			}
 			#ifndef ENCODER_4X_RESOLUTION
-			else if (i2ccmd == I2CCMD_READ_LASTDIR)
+			else if (i2ccmd == TQED_READ_LASTDIR)
 			{
 				usiTwiTransmitByte(enc_dir);
 			}
 			#endif
-			else if (i2ccmd == I2CCMD_RESET_COUNTER) enc_pos = 0L; //reset counter
-			else if (i2ccmd == I2CCMD_CENTER_COUNTER) enc_pos = 0L; //center counter value 
-			else if (i2ccmd == I2CCMD_SET_ADDRESS) setaddress(usiTwiReceiveByte());
+			else if (i2ccmd == TQED_RESET_COUNTER) enc_pos = 0L; //reset counter
+			else if (i2ccmd == TQED_CENTER_COUNTER) enc_pos = 0L; //center counter value
+			else if (i2ccmd == TQED_GET_COUNTERMIN)
+			{
+				position.value = (-(INT32_MAX)-1);
+				usiTwiTransmitByte(position.bytes[0]);
+				usiTwiTransmitByte(position.bytes[1]);
+				usiTwiTransmitByte(position.bytes[2]);
+				usiTwiTransmitByte(position.bytes[3]);
+			}
+			else if (i2ccmd == TQED_GET_COUNTERMAX)
+			{
+				position.value = INT32_MAX;
+				usiTwiTransmitByte(position.bytes[0]);
+				usiTwiTransmitByte(position.bytes[1]);
+				usiTwiTransmitByte(position.bytes[2]);
+				usiTwiTransmitByte(position.bytes[3]);
+			}
+			else if (i2ccmd == TQED_SET_ADDRESS) setaddress(usiTwiReceiveByte());
+			else if (i2ccmd == TQED_GET_ADDRESS) // return current address, as test for connection
+			{
+				usiTwiTransmitByte(address);
+			}
 		}
 	}
 }
